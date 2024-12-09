@@ -1,0 +1,21 @@
+[server]
+host = "0.0.0.0"
+port = 3000
+
+[rate_limit]
+enabled = true
+max_requests = 100
+expire_time = 60
+limit_body = 104857600 # 100 * 1024 * 1024 = 100MB
+
+[whitelist]
+enabled = true
+whitelisted_ips = ["127.0.0.1"]
+
+
+[perfomance]
+perfork = false
+concurrency = 65536 # 64 * 1024 = 64KB
+
+[cache]
+enabled = true
