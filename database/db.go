@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/MyCloudNest/Nest-Server/utils"
 	_ "github.com/mattn/go-sqlite3"
@@ -63,7 +64,7 @@ func init() {
 	}
 
 	if err = executeSQLFile(schemaPath); err != nil {
-		log.Fatalf("Failed to execute schema file: %v", err)
+		log.Printf("Warning: Failed to execute some schema statements: %v", err)
 	}
 
 	log.Println("Database initialized successfully")
@@ -91,6 +92,23 @@ func executeSQLFile(filePath string) error {
 		return err
 	}
 
-	_, err = DB.Exec(string(sqlContent))
-	return err
+	statements := strings.Split(string(sqlContent), ";")
+
+	for _, stmt := range statements {
+		stmt = strings.TrimSpace(stmt)
+		if stmt == "" {
+			continue
+		}
+
+		_, err := DB.Exec(stmt)
+		if err != nil {
+			if strings.Contains(err.Error(), "already exists") {
+				log.Printf("Skipping already existing object: %s", stmt)
+				continue
+			}
+			return err
+		}
+	}
+
+	return nil
 }
