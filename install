@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+OS=$(uname -s)
+ARCH=$(uname -m)
+
+if [ "$OS" != "Darwin" ] && [ "$OS" != "Linux" ]; then
+    echo -e "${RED}This script is only for macOS and Linux${NC}"
+    exit 1
+fi
+
+if [ "$ARCH" != "x86_64" ] && [ "$ARCH" != "arm64" ] && [ "$ARCH" != "aarch64" ]; then
+    echo -e "${RED}This script is only for x86_64 and arm64 architectures${NC}"
+    exit 1
+fi
+
+get_latest_version() {
+    local repo="MyCloudNest/Nest-Server"
+    local api_url="https://api.github.com/repos/$repo/releases/latest"
+
+    local latest_version=$(curl -s "$api_url" | jq -r '.tag_name')
+
+    if [ -z "$latest_version" ] || [ "$latest_version" == "null" ]; then
+        echo -e "${RED}Failed to fetch the latest version. Please check your internet connection or GitHub repository.${NC}"
+        exit 1
+    fi
+
+    echo "$latest_version"
+}
+
+download_binary() {
+    echo -e "${CYAN}Fetching the latest version from GitHub...${NC}"
+    local os=$1
+    local arch=$2
+    local version=$3
+    local repo="MyCloudNest/Nest-Server"
+    local binary_url="https://github.com/$repo/releases/download/$version/cloudnest-${os}-${arch}"
+    local binary_name="cloudnest"
+
+    echo -e "${CYAN}Downloading binary from ${binary_url}...${NC}"
+    curl -L "$binary_url" -o "$binary_name"
+
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Failed to download binary. Please check the URL or version.${NC}"
+        exit 1
+    fi
+
+    echo -e "${CYAN}Granting execute permissions to the binary...${NC}"
+    chmod +x "$binary_name"
+
+    echo -e "${CYAN}Moving the binary to /usr/local/bin/...${NC}"
+    if sudo mv "$binary_name" /usr/local/bin/cloudnest; then
+        echo -e "${GREEN}Binary moved successfully to /usr/local/bin/cloudnest${NC}"
+    else
+        echo -e "${RED}Failed to move the binary to /usr/local/bin/. Please check your permissions.${NC}"
+        exit 1
+    fi
+}
+
+install_mac_dependencies() {
+    echo -e "${CYAN}Installing Redis and SQLite...${NC}"
+    brew install redis sqlite
+    echo -e "${GREEN}Starting Redis service...${NC}"
+    brew services start redis
+}
+
+install_linux_dependencies() {
+    echo -e "${CYAN}Updating package list and installing Redis and SQLite...${NC}"
+    if command -v apt &> /dev/null; then
+        sudo apt update
+        sudo apt install -y redis sqlite3
+    elif command -v yum &> /dev/null; then
+        sudo yum install -y redis sqlite
+    elif command -v dnf &> /dev/null; then
+        sudo dnf install -y redis sqlite
+    else
+        echo -e "${RED}Unsupported package manager. Install Redis and SQLite manually.${NC}"
+        exit 1
+    fi
+    echo -e "${GREEN}Starting Redis service...${NC}"
+    sudo systemctl start redis
+    sudo systemctl enable redis
+}
+
+LATEST_VERSION=$(get_latest_version)
+echo $LATEST_VERSION
+
+if [ "$OS" == "Darwin" ] && [ "$ARCH" == "arm64" ]; then
+    echo -e "${BLUE}Detected macOS (arm64)${NC}"
+    download_binary "darwin" "arm64" "$LATEST_VERSION"
+    install_mac_dependencies
+    echo -e "${GREEN}Setup complete for macOS (arm64). You can now run 'cloudnest'.${NC}"
+
+elif [ "$OS" == "Darwin" ] && [ "$ARCH" == "x86_64" ]; then
+    echo -e "${BLUE}Detected macOS (x86_64)${NC}"
+    download_binary "darwin" "amd64" "$LATEST_VERSION"
+    install_mac_dependencies
+    echo -e "${GREEN}Setup complete for macOS (x86_64). You can now run 'cloudnest'.${NC}"
+
+elif [ "$OS" == "Linux" ]; then
+    echo -e "${BLUE}Detected Linux ($ARCH)${NC}"
+    if [ "$ARCH" == "x86_64" ]; then
+        download_binary "linux" "amd64" "$LATEST_VERSION"
+    elif [ "$ARCH" == "arm64" ] || [ "$ARCH" == "aarch64" ]; then
+        download_binary "linux" "arm64" "$LATEST_VERSION"
+    else
+        echo -e "${RED}Unsupported architecture for Linux${NC}"
+        exit 1
+    fi
+    install_linux_dependencies
+    echo -e "${GREEN}Setup complete for Linux ($ARCH). You can now run 'cloudnest'.${NC}"
+
+else
+    echo -e "${RED}Unsupported OS or architecture${NC}"
+    exit 1
+fi
