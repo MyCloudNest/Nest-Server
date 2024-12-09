@@ -3,10 +3,12 @@ package database
 import (
 	"database/sql"
 	"errors"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
 
+	"github.com/MyCloudNest/Nest-Server/utils"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -20,6 +22,7 @@ func init() {
 
 	dbDir := filepath.Join(homeDir, ".cloudnest")
 	dbPath := filepath.Join(dbDir, "db.sqlite")
+	schemaPath := filepath.Join(dbDir, "schema.sql")
 
 	if err = os.MkdirAll(dbDir, 0o700); err != nil {
 		log.Fatalf("Failed to create database directory: %v", err)
@@ -50,6 +53,19 @@ func init() {
 		log.Fatalf("Failed to set PRAGMA statements: %v", err)
 	}
 
+	schemaURL := "https://raw.githubusercontent.com/MyCloudNest/Nest-Server/refs/heads/main/database/migrations/schema.sql"
+	if _, err = os.Stat(schemaPath); os.IsNotExist(err) {
+		log.Println("Schema file not found. Downloading...")
+		if err = utils.DownloadFile(schemaURL, schemaPath); err != nil {
+			log.Fatalf("Failed to download schema file: %v", err)
+		}
+		log.Println("Schema file downloaded successfully:", schemaPath)
+	}
+
+	if err = executeSQLFile(schemaPath); err != nil {
+		log.Fatalf("Failed to execute schema file: %v", err)
+	}
+
 	log.Println("Database initialized successfully")
 }
 
@@ -61,4 +77,20 @@ func CloseDB() {
 			log.Println("Database connection closed successfully")
 		}
 	}
+}
+
+func executeSQLFile(filePath string) error {
+	sqlFile, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer sqlFile.Close()
+
+	sqlContent, err := io.ReadAll(sqlFile)
+	if err != nil {
+		return err
+	}
+
+	_, err = DB.Exec(string(sqlContent))
+	return err
 }
