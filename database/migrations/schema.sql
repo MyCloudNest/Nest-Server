@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS temporary_links (
 
 CREATE TABLE IF NOT EXISTS file_stats (
     id TEXT PRIMARY KEY,
-    file_id TEXT NOT NULL,
+    file_id TEXT NOT NULL UNIQUE,
     download_count INTEGER DEFAULT 0,
     last_downloaded_at DATETIME,
     FOREIGN KEY (file_id) REFERENCES files (id) ON DELETE CASCADE
