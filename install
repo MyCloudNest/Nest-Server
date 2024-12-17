@@ -79,6 +79,8 @@ install_linux_dependencies() {
         sudo yum install -y redis sqlite
     elif command -v dnf &> /dev/null; then
         sudo dnf install -y redis sqlite
+    elif command -v pacman &> /dev/null; then
+        sudo pacman -Syu --noconfirm redis sqlite
     else
         echo -e "${RED}Unsupported package manager. Install Redis and SQLite manually.${NC}"
         exit 1
